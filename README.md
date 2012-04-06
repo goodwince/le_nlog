@@ -81,6 +81,7 @@ the opening `<configuration>`
     </nlog>
 
 In the appSettings subsection, you must enter your account-key which you obtained earlier in the LOGENTRIES_ACCOUNT_KEY value. Then do the same for LOGENTRIES_LOCATION using the location of your logfile. This is in the format
+	
 	hostname/logfilename
 	
 If you would rather create a host and log from your command line instead of the Logentries UI,
