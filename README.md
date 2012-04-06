@@ -63,6 +63,10 @@ the opening `<configuration>`
     <configSections>
       <section name="nlog" type="NLog.Config.ConfigSectionHandler, NLog"/>
     </configSections>
+    <appSettings>
+      <add key="LOGENTRIES_ACCOUNT_KEY" value="" />
+      <add key="LOGENTRIES_LOCATION" value="" />
+    </appSettings>
     <nlog>
       <extensions>
         <add assembly="le_nlog"/>
@@ -76,9 +80,8 @@ the opening `<configuration>`
       </rules>
     </nlog>
 
-Replace the value "LOGENTRIES_ACCOUNT_KEY" with your account-key obtained earlier. Also replace the "LOGENTRIES_LOCATION" value. The value you provide here will appear in your Logentries account and will be used to identify your machine and log events. This should be in the following format:
-
-	hostname/logname.log
+In the appSettings subsection, you must enter your account-key which you obtained earlier in the LOGENTRIES_ACCOUNT_KEY value. Then do the same for LOGENTRIES_LOCATION using the location of your logfile. This is in the format
+	hostname/logfilename
 	
 If you would rather create a host and log from your command line instead of the Logentries UI,
 
