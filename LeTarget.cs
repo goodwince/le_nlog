@@ -1,5 +1,5 @@
 ﻿/*
-   Logentries Log4Net Logging agent
+   Logentries NLog Logging agent
    Copyright 2010,2011 Logentries, Jlizard
    Mark Lacomber <marklacomber@gmail.com>
                                             */
