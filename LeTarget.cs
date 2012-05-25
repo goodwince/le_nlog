@@ -1,4 +1,4 @@
-﻿// 
+// 
 // Copyright (c) 2010-2012 Logentries, Jlizard
 // 
 // All rights reserved.
@@ -34,12 +34,13 @@
 // Viliam Holub <vilda@logentries.com>
 
 using System;
-using System.Collections.Generic;
+using System.Configuration;
 using System.Linq;
 using System.Web;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.IO;
+using System.Text.RegularExpressions;
 
 using NLog;
 using NLog.Common;
@@ -117,7 +118,7 @@ namespace Le
             {
                 try
                 {
-                    this.createSocket(this.Key, this.Location);
+                     this.createSocket(this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
                 }
                 catch (Exception e)
                 {
@@ -135,7 +136,7 @@ namespace Le
             {
                 try
                 {
-                    this.createSocket(this.Key, this.Location);
+                    this.createSocket(this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
                     this.sendToLogentries(message);
                 }
                 catch (Exception ex)
@@ -168,6 +169,32 @@ namespace Le
             {
                 System.Diagnostics.Debug.WriteLine(msg);
                 Console.Error.WriteLine(msg);
+            }
+        }
+        
+        private string SubstituteAppSetting(string potentialKey)
+        {
+            /* This method isn't working, temporary below
+            var isWrappedPattern = new Regex(@"^\AppSetting\{(.*)\}$");
+
+            var matches = isWrappedPattern.Matches(potentialKey);
+            if (matches.Count == 1)
+            {
+                var settingKey = matches[0].Groups[1].Value;
+                var appSettings = ConfigurationManager.AppSettings;
+                if (appSettings.HasKeys() && appSettings.AllKeys.Contains(settingKey))
+                {
+                    return appSettings[settingKey];
+                }
+            }
+            return potentialKey;
+             */
+            var appSettings = ConfigurationManager.AppSettings;
+            if (appSettings.HasKeys() && appSettings.AllKeys.Contains(potentialKey))
+            {
+                return appSettings[potentialKey];
+            }else{
+                return potentialKey;
             }
         }
     }
