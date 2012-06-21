@@ -35,12 +35,15 @@
 
 using System;
 using System.Configuration;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Linq;
 using System.Web;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 using NLog;
 using NLog.Common;
@@ -49,152 +52,355 @@ using NLog.Internal;
 using NLog.Internal.NetworkSenders;
 using NLog.Layouts;
 using NLog.Targets;
+using System.Text;
 
 namespace Le
 {
-    /// <summary>
-    /// Logentries agent for remote logging
-    /// </summary>
     [Target("Logentries")]
     public sealed class LeTarget : TargetWithLayout
     {
-        private SslStream sslSock = null;
-        private TcpClient leSocket = null;
-        private System.Text.UTF8Encoding encoding;
+        /*
+         * Constants
+         */
+
+        /** Size of the internal event queue. */
+        public static readonly int QUEUE_SIZE = 32768;
+        /** Logentries API server address. */
+        static readonly String LE_API = "api.logentries.com";
+        /** Default port number for Logentries API server. */
+        static readonly int LE_PORT = 80;
+        /** Default SSL port number for Logentries API server. */
+        static readonly int LE_SSL_PORT = 443;
+        /** UTF-8 output character set. */
+        static readonly UTF8Encoding UTF8 = new UTF8Encoding();
+        /** ASCII character set used by HTTP. */
+        static readonly ASCIIEncoding ASCII = new ASCIIEncoding();
+        /** Minimal delay between attempts to reconnect in milliseconds. */
+        static readonly int MIN_DELAY = 100;
+        /** Maximal delay between attempts to reconnect in milliseconds. */
+        static readonly int MAX_DELAY = 10000;
+        /** LE appender signature - used for debugging messages. */
+        static readonly String LE = "LE: ";
+        /** Logentries Config Key */
+        static readonly String CONFIG_KEY = "LOGENTRIES_ACCOUNT_KEY";
+        /** Logentries Config Location */
+        static readonly String CONFIG_LOCATION = "LOGENTRIES_LOCATION";
+        /** Error message displayed when wrong configuration has been detected. */
+        static readonly String WRONG_CONFIG = "\n\nIt appears you forgot to customize your web.config file!\n\n";
+        
+        readonly Random random = new Random();
+
+	  //Custom socket class to allow for choice of SSL
+        private MyTcpClient socket = null;
+        public Thread thread;
+        public bool started = false;
+        /** Message Queue. */
+        public BlockingCollection<byte[]> queue;
 
         public LeTarget()
         {
-
+            queue = new BlockingCollection<byte[]>(QUEUE_SIZE);
+            
+            thread = new Thread(new ThreadStart(run_loop));
+            thread.Name = "Logentries NLog Target";
+            thread.IsBackground = true;
         }
-
+        /** Account key. */
         [RequiredParameter]
         public string Key { get; set; }
-
+        /** Log location. */
         [RequiredParameter]
         public string Location { get; set; }
-        
+        /** Use SSL indicator. */
+        [RequiredParameter]
+        public bool Ssl { get; set; }
+        /** Debug flag. */
         [RequiredParameter]
         public bool Debug { get; set; }
-
+       
         public bool KeepConnection { get; set; }
 
-        /// <summary>
-        /// Opens a secure connection with the Logentries server.
-        /// </summary>
-        /// <param name="key">Account key</param>
-        /// <param name="location">Location of the destination log</param>
-        private void createSocket(String key, String location)
+        private void openConnection()
         {
-            this.leSocket = new TcpClient("api.logentries.com", 443);
-            this.leSocket.NoDelay = true;
-            this.sslSock = new SslStream(this.leSocket.GetStream());
-            this.encoding = new System.Text.UTF8Encoding();
-
-            this.sslSock.AuthenticateAsClient("logentries.com");
-
-            String output = "PUT /" + key + "/hosts/" + location + "/?realtime=1 HTTP/1.1\r\n\r\n";
-            this.sslSock.Write(this.encoding.GetBytes(output), 0, output.Length);
-        }
-
-        /// <summary>
-        /// Converts the log entry given into byte array.
-        /// </summary>
-        /// <param name="logEvent">Log event to convert</param>
-        /// <returns>Log entry in byte array</returns>
-        private byte[] GetBytesToWrite(LogEventInfo logEvent)
-        {
-            string text = this.Layout.Render(logEvent) + "\r\n";
-
-            return this.encoding.GetBytes(text);
-        }
-
-        /// <summary>
-        /// Sends the events given to Logentries.
-        /// <summary>
-        /// <param name="logEvent">Log event to send</param>
-        protected override void Write(LogEventInfo logEvent)
-        {
-            if (this.sslSock == null)
-            {
-                try
-                {
-                     this.createSocket(this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
-                }
-                catch (Exception e)
-                {
-                     WriteDebugMessages("Error connecting to Logentries", e);
-                }
-            }
-
-            byte[] message = this.GetBytesToWrite(logEvent);
+            String api_addr = LE_API;
 
             try
             {
-                this.sendToLogentries(message);
+                this.socket = new MyTcpClient(LE_API, Ssl);
+                
+                String header = String.Format("PUT /{0}/hosts/{1}/?realtime=1 HTTP/1.1\r\n\r\n",this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
+                this.socket.Write(ASCII.GetBytes(header), 0, header.Length);
             }
-            catch (Exception)
+            catch
+            {
+                throw new IOException();
+            }
+        }
+
+        private void reopenConnection()
+        {
+            closeConnection();
+
+            int root_delay = MIN_DELAY;
+            while (true)
             {
                 try
                 {
-                    this.createSocket(this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
-                    this.sendToLogentries(message);
+                    openConnection();
+
+                    return;
                 }
-                catch (Exception ex)
+                catch(Exception e)
                 {
-                     WriteDebugMessages("Error sending log to Logentries", ex);
+                    if (Debug)
+                    {
+                        WriteDebugMessages("Unable to connect to Logentries", e);
+                    }
+                }
+
+                root_delay *= 2;
+                if (root_delay > MAX_DELAY)
+                    root_delay = MAX_DELAY;
+                int wait_for = root_delay + random.Next(root_delay);
+
+                try
+                {
+                    Thread.Sleep(wait_for);
+                }
+                catch
+                {
+                    throw new ThreadInterruptedException();
                 }
             }
         }
 
-        /// <summary>
-        /// Sends the message in bytes to Logentries server.
-        /// </summary>
-        /// <param name="message">Message to send in bytes</param>
-        private void sendToLogentries(byte[] message)
+        private void closeConnection()
         {
-            this.sslSock.Write(message, 0, message.Length);
+            if(this.socket != null)
+                this.socket.Close();
         }
-        
-        /// <summary>
-        /// Writes debug message on console. This method is called to display
-        /// error messages.
-        /// </summary>
-	/// <param name="message">Message to write</param>
-	/// <param name="e">Exception to write</param>
+
+        public void run_loop()
+        {
+            try
+            {
+                // Open connection
+                reopenConnection();
+
+                // Send data in queue
+                while (true)
+                {
+                    //Take data from queue
+                    byte[] data = queue.Take();
+
+                    //Send data, reconnect if needed
+                    while (true)
+                    {
+                        try
+                        {
+                            socket.Write(data, 0, data.Length);
+                            socket.Flush();
+                        }
+                        catch (IOException e)
+                        {
+                            //Reopen the lost connection
+                            reopenConnection();
+                            continue;
+                        }
+                        break;
+                    }
+                }
+            }
+            catch (ThreadInterruptedException e)
+            {
+                WriteDebugMessages("Asynchronous socket client interrupted");
+            }
+
+            closeConnection();
+        }
+
+        private void addLine(String line)
+        {
+            WriteDebugMessages("Queueing " + line);
+
+            byte[] data = UTF8.GetBytes(line+'\n');
+
+            //Try to append data to queue
+            bool is_full = !queue.TryAdd(data);
+
+            //If it's full, remove latest item and try again
+            if (is_full)
+            {
+                queue.Take();
+                queue.TryAdd(data);
+            }
+        }
+
+        private bool checkCredentials()
+        {
+            var appSettings = ConfigurationManager.AppSettings;
+            if (!appSettings.AllKeys.Contains(CONFIG_KEY) || !appSettings.AllKeys.Contains(CONFIG_LOCATION))
+                return false;
+            if (appSettings[CONFIG_KEY] == "" || appSettings[CONFIG_LOCATION] == "")
+                return false;
+
+            return true;
+        }
+
+        protected override void Write(LogEventInfo logEvent)
+        {
+            if (!checkCredentials())
+            {
+                WriteDebugMessages(WRONG_CONFIG);
+                return;
+            }
+            if (!started)
+            {
+                WriteDebugMessages("Starting asynchronous socket client"); 
+                thread.Start();
+                started = true;
+            }
+
+            //Append message content
+            addLine(this.Layout.Render(logEvent));
+
+			try{
+				String excep = logEvent.Exception.ToString();
+				if(excep.Length > 0)
+				{
+					excep = excep.Replace('\n', '\u2028');
+					addLine(excep);
+				}
+			}
+			catch{ }
+        }
+
+        protected override void CloseTarget()
+        {
+            base.CloseTarget();
+
+            thread.Interrupt();
+            //Debug message
+        }
+		
+		//Used for UnitTests, write method is protected
+		public void TestWrite(LogEventInfo logEvent)
+		{
+			this.Write(logEvent);
+		}
+		
+		//Used for UnitTests, CloseTarget method is protected
+		public void TestClose()
+		{
+			this.CloseTarget();
+		}
+
         private void WriteDebugMessages(string message, Exception e)
         {
+            message = LE + message;
             if (!this.Debug) return;
-            string[] messages = {message, e.ToString()};
+            string[] messages = { message, e.ToString() };
             foreach (var msg in messages)
             {
                 System.Diagnostics.Debug.WriteLine(msg);
                 Console.Error.WriteLine(msg);
+                //Log to NLog's internal logger also
+                InternalLogger.Debug(msg);
             }
         }
-        
+
+        private void WriteDebugMessages(string message)
+        {
+            message = LE + message;
+            if (!this.Debug) return;
+            System.Diagnostics.Debug.WriteLine(message);
+            Console.Error.WriteLine(message);
+            //Log to NLog's internal logger also
+            InternalLogger.Debug(message);
+        }
+
         private string SubstituteAppSetting(string potentialKey)
         {
-            /* This method isn't working, temporary below
-            var isWrappedPattern = new Regex(@"^\AppSetting\{(.*)\}$");
-
-            var matches = isWrappedPattern.Matches(potentialKey);
-            if (matches.Count == 1)
-            {
-                var settingKey = matches[0].Groups[1].Value;
-                var appSettings = ConfigurationManager.AppSettings;
-                if (appSettings.HasKeys() && appSettings.AllKeys.Contains(settingKey))
-                {
-                    return appSettings[settingKey];
-                }
-            }
-            return potentialKey;
-             */
             var appSettings = ConfigurationManager.AppSettings;
             if (appSettings.HasKeys() && appSettings.AllKeys.Contains(potentialKey))
             {
                 return appSettings[potentialKey];
             }else{
                 return potentialKey;
+            }
+        }
+
+	 //Custom class to differentiate between Stream and SslStream
+	 //as they don't share a common base class in C#
+        private class MyTcpClient
+        {
+            private TcpClient client = null;
+            private Stream stream = null;
+            private SslStream stream_ssl = null;
+            private bool ssl_choice;
+
+            public MyTcpClient(String host, bool Ssl)
+            {
+                int port = Ssl ? LE_SSL_PORT : LE_PORT;
+                client = new TcpClient(host, port);
+                client.NoDelay = true;
+                ssl_choice = Ssl;
+                this.stream = client.GetStream();
+
+                if (Ssl)
+                {
+                    this.stream_ssl = new SslStream(this.stream);
+                    this.stream_ssl.AuthenticateAsClient("logentries.com");
+                }
+            }
+
+            public void Write(byte[] buffer, int offset, int count)
+            {
+                if (ssl_choice)
+                {
+                    this.stream_ssl.Write(buffer, offset, count);
+                }
+                else
+                {
+                    this.stream.Write(buffer, offset, count);
+                }
+            }
+
+            public void Flush()
+            {
+                if (ssl_choice)
+                {
+                    this.stream_ssl.Flush();
+                }
+                else
+                {
+                    this.stream.Flush();
+                }
+            }
+
+            public void Close()
+            {
+                if (ssl_choice)
+                {
+                    if (stream_ssl != null)
+                    {
+                        try
+                        {
+                            this.stream_ssl.Close();
+                        }
+                        catch { }
+                    }
+                    this.stream_ssl = null;
+                }
+                if (this.client != null)
+                {
+                    try
+                    {
+                        this.client.Close();
+                    }
+                    catch { }
+                }
+                this.client = null;
             }
         }
     }
