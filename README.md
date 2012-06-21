@@ -47,7 +47,7 @@ This will also install NLog into your project if it is not already installed.
 
 If you're not using Nuget, the library can be downloaded from:
 
-https://github.com/downloads/logentries/le_nlog/le_nlog.dll
+https://github.com/downloads/MarkLC/le_log4net_async/LeLog4net.dll
 
 It will need to be referenced in your project.
 
@@ -73,7 +73,7 @@ the opening `<configuration>`
       </extensions>
       <targets>
         <target name="logentries" type="Logentries" key="LOGENTRIES_ACCOUNT_KEY" location="LOGENTRIES_LOCATION" 
-            debug="true" layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}, ${exception:format=tostring}"/>
+            debug="true" ssl="false" layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
         <logger name="*" minLevel="Info" appendTo="logentries"/>
@@ -114,4 +114,3 @@ Example:
 	log.Debug("Debugging Message");
 	log.Info("Informational message");
 	log.Warn("Warning Message");
-
