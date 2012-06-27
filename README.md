@@ -126,8 +126,8 @@ Example:
 Troubleshooting
 ---------------
 
-The Logentries plugin logs its debug messages to NLog's Internal Logger, if you wish to see these change the opening <nlog> statement in web.config to:
+The Logentries plugin logs its debug messages to NLog's Internal Logger, if you wish to see these change the opening `<nlog>` statement in web.config to:
 
-<nlog internalLogFile="..." internalLogLevel="Debug">
+`<nlog internalLogFile="..." internalLogLevel="Debug">`
 
 Insert the location of a file on your local system to write to, ensuring that its not read-only.
