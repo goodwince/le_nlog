@@ -50,6 +50,10 @@ The package is found at https://nuget.org/List/Packages/le_nlog
 
 This will also install NLog into your project if it is not already installed.
 
+If you wish to install the library manually, you can find le_nlog.dll in the Downloads tab for this repo.
+
+You will also have to install NLog yourself if you are not using our nuget.
+
 NLog Config
 ------------------
 
