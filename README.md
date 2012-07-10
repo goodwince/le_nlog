@@ -126,3 +126,6 @@ The Logentries plugin logs its debug messages to NLog's Internal Logger, if you 
 `<nlog internalLogFile="..." internalLogLevel="Debug">`
 
 Insert the location of a file on your local system to write to, ensuring that its not read-only.
+
+You can also download a hello world sample app from the Downloads section. It is ready to go and only needs LOGENTRIES_ACCOUNT_KEY
+and LOGENTRIES_LOCATION to be entered into the web.config
