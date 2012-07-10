@@ -107,12 +107,6 @@ namespace Le
             thread.Name = "Logentries NLog Target";
             thread.IsBackground = true;
         }
-        /** Account key. */
-        [RequiredParameter]
-        public string Key { get; set; }
-        /** Log location. */
-        [RequiredParameter]
-        public string Location { get; set; }
         /** Use SSL indicator. */
         [RequiredParameter]
         public bool Ssl { get; set; }
@@ -130,7 +124,7 @@ namespace Le
             {
                 this.socket = new MyTcpClient(LE_API, Ssl);
                 
-                String header = String.Format("PUT /{0}/hosts/{1}/?realtime=1 HTTP/1.1\r\n\r\n",this.SubstituteAppSetting(this.Key), this.SubstituteAppSetting(this.Location));
+                String header = String.Format("PUT /{0}/hosts/{1}/?realtime=1 HTTP/1.1\r\n\r\n",this.SubstituteAppSetting(CONFIG_KEY), this.SubstituteAppSetting(CONFIG_LOCATION));
                 this.socket.Write(ASCII.GetBytes(header), 0, header.Length);
             }
             catch
@@ -321,14 +315,14 @@ namespace Le
             InternalLogger.Debug(message);
         }
 
-        private string SubstituteAppSetting(string potentialKey)
+        private string SubstituteAppSetting(string key)
         {
             var appSettings = ConfigurationManager.AppSettings;
-            if (appSettings.HasKeys() && appSettings.AllKeys.Contains(potentialKey))
+            if (appSettings.HasKeys() && appSettings.AllKeys.Contains(key))
             {
-                return appSettings[potentialKey];
+                return appSettings[key];
             }else{
-                return potentialKey;
+                return key;
             }
         }
 

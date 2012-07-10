@@ -70,8 +70,8 @@ If you are not using the Nuget, copy and paste it directly under the opening `<c
         <add assembly="le_nlog"/>
       </extensions>
       <targets>
-        <target name="logentries" type="Logentries" key="LOGENTRIES_ACCOUNT_KEY" location="LOGENTRIES_LOCATION" 
-            debug="true" ssl="false" layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
+        <target name="logentries" type="Logentries" debug="true" ssl="false" 
+		layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
         <logger name="*" minLevel="Info" appendTo="logentries"/>
