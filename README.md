@@ -78,7 +78,7 @@ If you are not using the Nuget, copy and paste it directly under the opening `<c
 		layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
-        <logger name="*" minLevel="Info" appendTo="logentries"/>
+        <logger name="*" minLevel="Debug" appendTo="logentries"/>
       </rules>
     </nlog>
 
