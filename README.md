@@ -50,14 +50,6 @@ The package is found at https://nuget.org/List/Packages/le_nlog
 
 This will also install NLog into your project if it is not already installed.
 
-If you're not using Nuget, the library can be downloaded from:
-
-https://github.com/downloads/MarkLC/le_log4net_async/LeLog4net.dll
-
-It will need to be referenced in your project.
-
-If you use this option, make sure to install NLog  appropriately.
-
 NLog Config
 ------------------
 
