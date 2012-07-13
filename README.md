@@ -82,7 +82,7 @@ If you are not using the Nuget, copy and paste it directly under the opening `<c
       </rules>
     </nlog>
 
-If are using App.config in your project, you will need to set the "Copy to output Directory" property of App.config to "Copy always". This 
+If you are using App.config in your project, you will need to set the "Copy to output Directory" property of App.config to "Copy always". This 
 can be done inside Visual Studio. In the appSettings subsection, using your account-key which you obtained earlier, fill in the value for 
 LOGENTRIES_ACCOUNT_KEY. Also replace the "LOGENTRIES_LOCATION" value with the location of your logfile on Logentries. This should be in the following format:
 	
