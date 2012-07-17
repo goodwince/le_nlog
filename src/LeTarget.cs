@@ -276,7 +276,8 @@ namespace Le
             base.CloseTarget();
 
             thread.Interrupt();
-            //Debug message
+            
+            started = false;
         }
 		
 		//Used for UnitTests, write method is protected
