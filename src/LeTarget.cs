@@ -67,12 +67,8 @@ namespace Le
         public static readonly int QUEUE_SIZE = 32768;
         /** Logentries API server address. */
         static readonly String LE_API = "api.logentries.com";
-        /** Logentries Client Authentication */
-        static readonly String LE_AUTH_CLIENT = "logentries.com";
-        /** Default port number for Logentries API server. */
-        static readonly int LE_PORT = 80;
-        /** Default SSL port number for Logentries API server. */
-        static readonly int LE_SSL_PORT = 443;
+        /** Port number for token logging on Logentries API server. */
+        static readonly int LE_PORT = 10000;
         /** UTF-8 output character set. */
         static readonly UTF8Encoding UTF8 = new UTF8Encoding();
         /** ASCII character set used by HTTP. */
@@ -84,18 +80,18 @@ namespace Le
         /** LE appender signature - used for debugging messages. */
         static readonly String LE = "LE: ";
         /** Logentries Config Key */
-        static readonly String CONFIG_KEY = "LOGENTRIES_ACCOUNT_KEY";
-        /** Logentries Config Location */
-        static readonly String CONFIG_LOCATION = "LOGENTRIES_LOCATION";
-        /** Error message displayed when wrong configuration has been detected. */
-        static readonly String WRONG_CONFIG = "\n\nIt appears you forgot to customize your web.config file!\n\n";
+        static readonly String CONFIG_TOKEN = "LOGENTRIES_TOKEN";
+        /** Error message displayed when invalid token is detected. */
+        static readonly String INVALID_TOKEN = "\n\nIt appears your LOGENTRIES_TOKEN parameter in web/app.config is invalid!\n\n";
         
         readonly Random random = new Random();
 
 	  //Custom socket class to allow for choice of SSL
-        private MyTcpClient socket = null;
+        private TcpClient client = null;
+        private Stream sock = null;
         public Thread thread;
         public bool started = false;
+        private String token = null;
         /** Message Queue. */
         public BlockingCollection<byte[]> queue;
 
@@ -107,9 +103,6 @@ namespace Le
             thread.Name = "Logentries NLog Target";
             thread.IsBackground = true;
         }
-        /** Use SSL indicator. */
-        [RequiredParameter]
-        public bool Ssl { get; set; }
         /** Debug flag. */
         [RequiredParameter]
         public bool Debug { get; set; }
@@ -118,14 +111,14 @@ namespace Le
 
         private void openConnection()
         {
-            String api_addr = LE_API;
-
             try
             {
-                this.socket = new MyTcpClient(LE_API, Ssl);
-                
-                String header = String.Format("PUT /{0}/hosts/{1}/?realtime=1 HTTP/1.1\r\n\r\n",this.SubstituteAppSetting(CONFIG_KEY), this.SubstituteAppSetting(CONFIG_LOCATION));
-                this.socket.Write(ASCII.GetBytes(header), 0, header.Length);
+                this.client = new TcpClient(LE_API, LE_PORT);
+                this.client.NoDelay = true;
+
+                this.sock = this.client.GetStream();
+
+                this.token = this.SubstituteAppSetting(CONFIG_TOKEN);
             }
             catch
             {
@@ -172,8 +165,8 @@ namespace Le
 
         private void closeConnection()
         {
-            if(this.socket != null)
-                this.socket.Close();
+            if(this.client != null)
+                this.client.Close();
         }
 
         public void run_loop()
@@ -194,8 +187,8 @@ namespace Le
                     {
                         try
                         {
-                            socket.Write(data, 0, data.Length);
-                            socket.Flush();
+                            this.sock.Write(data, 0, data.Length);
+                            this.sock.Flush();
                         }
                         catch (IOException e)
                         {
@@ -209,7 +202,7 @@ namespace Le
             }
             catch (ThreadInterruptedException e)
             {
-                WriteDebugMessages("Asynchronous socket client interrupted");
+                WriteDebugMessages("Logentries asynchronous socket interrupted");
             }
 
             closeConnection();
@@ -219,7 +212,7 @@ namespace Le
         {
             WriteDebugMessages("Queueing " + line);
 
-            byte[] data = UTF8.GetBytes(line+'\n');
+            byte[] data = UTF8.GetBytes(this.token + line+'\n');
 
             //Try to append data to queue
             bool is_full = !queue.TryAdd(data);
@@ -235,11 +228,16 @@ namespace Le
         private bool checkCredentials()
         {
             var appSettings = ConfigurationManager.AppSettings;
-            if (!appSettings.AllKeys.Contains(CONFIG_KEY) || !appSettings.AllKeys.Contains(CONFIG_LOCATION))
+            if (!appSettings.AllKeys.Contains(CONFIG_TOKEN))
                 return false;
-            if (appSettings[CONFIG_KEY] == "" || appSettings[CONFIG_LOCATION] == "")
+            if (appSettings[CONFIG_TOKEN] == "")
                 return false;
-
+            System.Guid newGuid = System.Guid.NewGuid();
+            if (!System.Guid.TryParse(appSettings[CONFIG_TOKEN], out newGuid))
+            {
+                WriteDebugMessages(INVALID_TOKEN);
+                return false;
+            }
             return true;
         }
 
@@ -247,12 +245,12 @@ namespace Le
         {
             if (!checkCredentials())
             {
-                WriteDebugMessages(WRONG_CONFIG);
+                WriteDebugMessages(INVALID_TOKEN);
                 return;
             }
             if (!started)
             {
-                WriteDebugMessages("Starting asynchronous socket client"); 
+                WriteDebugMessages("Starting Logentries asynchronous socket client"); 
                 thread.Start();
                 started = true;
             }
@@ -276,8 +274,7 @@ namespace Le
             base.CloseTarget();
 
             thread.Interrupt();
-            
-            started = false;
+            //Debug message
         }
 		
 		//Used for UnitTests, write method is protected
@@ -324,80 +321,6 @@ namespace Le
                 return appSettings[key];
             }else{
                 return key;
-            }
-        }
-
-	 //Custom class to differentiate between Stream and SslStream
-	 //as they don't share a common base class in C#
-        private class MyTcpClient
-        {
-            private TcpClient client = null;
-            private Stream stream = null;
-            private SslStream stream_ssl = null;
-            private bool ssl_choice;
-
-            public MyTcpClient(String host, bool Ssl)
-            {
-                int port = Ssl ? LE_SSL_PORT : LE_PORT;
-                client = new TcpClient(host, port);
-                client.NoDelay = true;
-                ssl_choice = Ssl;
-                this.stream = client.GetStream();
-
-                if (Ssl)
-                {
-                    this.stream_ssl = new SslStream(this.stream);
-                    this.stream_ssl.AuthenticateAsClient(LE_AUTH_CLIENT);
-                }
-            }
-
-            public void Write(byte[] buffer, int offset, int count)
-            {
-                if (ssl_choice)
-                {
-                    this.stream_ssl.Write(buffer, offset, count);
-                }
-                else
-                {
-                    this.stream.Write(buffer, offset, count);
-                }
-            }
-
-            public void Flush()
-            {
-                if (ssl_choice)
-                {
-                    this.stream_ssl.Flush();
-                }
-                else
-                {
-                    this.stream.Flush();
-                }
-            }
-
-            public void Close()
-            {
-                if (ssl_choice)
-                {
-                    if (stream_ssl != null)
-                    {
-                        try
-                        {
-                            this.stream_ssl.Close();
-                        }
-                        catch { }
-                    }
-                    this.stream_ssl = null;
-                }
-                if (this.client != null)
-                {
-                    try
-                    {
-                        this.client.Close();
-                    }
-                    catch { }
-                }
-                this.client = null;
             }
         }
     }
