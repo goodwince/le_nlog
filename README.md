@@ -61,7 +61,7 @@ NLog Config
 In the `<appSettings>` section of your `Web/App.config`, replace `LOGENTRIES_TOKEN` with the 
 token that is printed in grey beside the logfile you created in the Logentries UI.
 
-To configure NLog along with the plug-in paste the following into your `Web/App.config` directly underneath the opening
+To configure NLog along with the plug-in, paste the following into your `Web/App.config` directly underneath the opening
 `<configuration>`
 
     <configSections>
@@ -95,7 +95,7 @@ In each class you wish to log from, enter the following using directive at the t
 
 Then create this object at class-level:
 
-    private static readonly Logger log = LogManager.GetLogger(typeof(NAME_OF_CLASS).Name);
+    private static readonly Logger log = LogManager.GetCurrentClassLogger();
 
 What this does is create a logger with the name of the current class for
 clarity in the logs.
