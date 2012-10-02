@@ -25,20 +25,21 @@ Simple Usage Example
 
 
 A Sample Hello World App can be found in the download section. This simply
-requires you to enter your `LOGENTRIES_ACCOUNT_KEY` and `LOGENTRIES_LOCATION`
-in the appSettings section of `web/app.config`. This is explained in more
+requires you to enter your `LOGENTRIES_TOKEN` in the appSettings section of `web/app.config`. This is explained in more
 detail in the instructions below.
 
 To configure NLog, you will need to perform the following:
 
-    * (1) Obtain your Logentries account key.
+    * (1) Create a Logentries Account.
     * (2) Setup NLog (if you are not already using it).
     * (3) Configure the Logentries NLog plugin.
 
-You can obtain your Logentries account key on the Logentries UI, by clicking
-account in the bottom left corner.
 
-It will be displayed in grey on the right hand side.
+Create your Logentries Account
+------------------------------
+You can register your account on Logentries simply by clicking `Sign Up` at the top of the screen.
+Once logged in, create a new host with a name that best represents your app. Select this host and create a 
+new logfile of source type `TOKEN TCP` with a name that represents what you will be logging, these names are for your own benefit.
 
 Logentries NLog Plugin Setup
 ----------------------------
@@ -57,26 +58,21 @@ You will also have to install NLog yourself if you are not using our nuget.
 NLog Config
 -----------
 
-The following configuration is placed in your `web/app.config` automatically by
-our Nuget. However if a web/app config does not exist when you install the
-Nuget, you must do it manually.
+In the `<appSettings>` section of your `Web/App.config`, replace `LOGENTRIES_TOKEN` with the 
+token that is printed in grey beside the logfile you created in the Logentries UI.
 
-If you are not using the Nuget, copy and paste it directly under the opening
+To configure NLog along with the plug-in, paste the following into your `Web/App.config` directly underneath the opening
 `<configuration>`
 
     <configSections>
       <section name="nlog" type="NLog.Config.ConfigSectionHandler, NLog"/>
     </configSections>
-    <appSettings>
-      <add key="LOGENTRIES_ACCOUNT_KEY" value="" />
-      <add key="LOGENTRIES_LOCATION" value="" />
-    </appSettings>
     <nlog>
       <extensions>
         <add assembly="le_nlog"/>
       </extensions>
       <targets>
-        <target name="logentries" type="Logentries" debug="true" ssl="false" 
+        <target name="logentries" type="Logentries" debug="true"
 		layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
@@ -86,18 +82,7 @@ If you are not using the Nuget, copy and paste it directly under the opening
 
 If you are using App.config in your project, you will need to set the "Copy to
 output Directory" property of App.config to "Copy always". This can be done
-inside Visual Studio. In the appSettings subsection, using your account-key
-which you obtained earlier, fill in the value for `LOGENTRIES_ACCOUNT_KEY`.
-Also replace the `LOGENTRIES_LOCATION` value with the location of your logfile
-on Logentries. This should be in the following format:
-	
-    hostname/logfilename
-	
-If you would rather create a host and log file from your command line instead
-of the Logentries UI, you can use the following program:
-
-    https://github.com/downloads/logentries/le_nlog/register.exe
-
+inside Visual Studio. 
 
 Logging Messages
 ----------------
@@ -110,7 +95,7 @@ In each class you wish to log from, enter the following using directive at the t
 
 Then create this object at class-level:
 
-    private static readonly Logger log = LogManager.GetLogger(typeof(NAME_OF_CLASS).Name);
+    private static readonly Logger log = LogManager.GetCurrentClassLogger();
 
 What this does is create a logger with the name of the current class for
 clarity in the logs.
@@ -134,8 +119,3 @@ wish to see these change the opening `<nlog>` statement in web.config to:
 
 Insert the location of a file on your local system to write to, ensuring that
 its not read-only.
-
-You can also download a hello world sample app from the Downloads section. It
-is ready to go and only needs `LOGENTRIES_ACCOUNT_KEY` and
-`LOGENTRIES_LOCATION` to be entered into the `web.config`.
-
