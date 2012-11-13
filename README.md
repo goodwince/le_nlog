@@ -94,7 +94,7 @@ Next, change the httpPut parameter in the above snippet to true. HTTP PUT requir
 
 You can obtain your account key, by Selecting Account on the left sidebar when logged in and clicking Account Key.
 
-Your LOGENTRIES_LOCATION parameter is the name of your host folled by the name of your logfile in the following format:  "hostName/logName"
+Your LOGENTRIES_LOCATION parameter is the name of your host followed by the name of your logfile in the following format:  "hostName/logName"
 
 
 -----------------
