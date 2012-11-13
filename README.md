@@ -58,9 +58,6 @@ You will also have to install NLog yourself if you are not using our nuget.
 NLog Config
 -----------
 
-In the `<appSettings>` section of your `Web/App.config`, replace `LOGENTRIES_TOKEN` with the 
-token that is printed in grey beside the logfile you created in the Logentries UI.
-
 To configure NLog along with the plug-in, paste the following into your `Web/App.config` directly underneath the opening
 `<configuration>`
 
@@ -72,13 +69,35 @@ To configure NLog along with the plug-in, paste the following into your `Web/App
         <add assembly="le_nlog"/>
       </extensions>
       <targets>
-        <target name="logentries" type="Logentries" debug="true"
+        <target name="logentries" type="Logentries" debug="true" httpPut="false"
 		layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
         <logger name="*" minLevel="Debug" appendTo="logentries"/>
       </rules>
     </nlog>
+
+Token-Based Logging
+-------------------
+
+Our default method of sending logs to Logentries is via Token TCP over port 10000. To use this, create a new logfile in the Logentries UI, and select Token TCP as the source type.
+
+Then paste the token that is printed beside the logfile in the appSettings section of your web/app.config file for LOGENTRIES_TOKEN.
+
+
+HTTP PUT Logging
+----------------
+
+Older versions of this library used HTTP PUT over port 80, which is still supported. To use this, create a new logfile in the Logentries UI, and select api/HTTP PUT as the source type.
+
+Next, change the httpPut parameter in the above snippet to true. HTTP PUT requires two parameters called LOGENTRIES_ACCOUNT_KEY and LOGENTRIES_LOCATION in your appSettings to be set.
+
+You can obtain your account key, by Selecting Account on the left sidebar when logged in and clicking Account Key.
+
+Your LOGENTRIES_LOCATION parameter is the name of your host folled by the name of your logfile in the following format:  "hostName/logName"
+
+
+-----------------
 
 If you are using App.config in your project, you will need to set the "Copy to
 output Directory" property of App.config to "Copy always". This can be done
