@@ -40,6 +40,7 @@ Create your Logentries Account
 You can register your account on Logentries simply by clicking `Sign Up` at the top of the screen.
 Once logged in, create a new host with a name that best represents your app. Select this host and create a 
 new logfile of source type `TOKEN TCP` with a name that represents what you will be logging, these names are for your own benefit.
+Scroll down for instructions on using HTTP PUT method of sending logs, this requires a different choice for source type.
 
 Logentries NLog Plugin Setup
 ----------------------------
@@ -69,7 +70,7 @@ To configure NLog along with the plug-in, paste the following into your `Web/App
         <add assembly="le_nlog"/>
       </extensions>
       <targets>
-        <target name="logentries" type="Logentries" debug="true" httpPut="false"
+        <target name="logentries" type="Logentries" debug="true" httpPut="false" ssl="false"
 		layout="${date:format=ddd MMM dd} ${time:format=HH:mm:ss} ${date:format=zzz yyyy} ${logger} : ${LEVEL}, ${message}"/>
       </targets>
       <rules>
@@ -95,6 +96,11 @@ Next, change the httpPut parameter in the above snippet to true. HTTP PUT requir
 You can obtain your account key, by Selecting Account on the left sidebar when logged in and clicking Account Key.
 
 Your LOGENTRIES_LOCATION parameter is the name of your host followed by the name of your logfile in the following format:  "hostName/logName"
+
+
+SSL/TLS
+-------
+This library supports SSL/TLS logging over both the above logging methods by setting the Ssl value to true in the appender definition. This may have a performance impact however.
 
 
 -----------------
