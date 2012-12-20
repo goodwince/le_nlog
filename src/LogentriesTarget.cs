@@ -34,7 +34,7 @@
 // Viliam Holub <vilda@logentries.com>
 
 /*
- *   VERSION: 2.1.2
+ *   VERSION: 2.1.3
  */
 
 using System;
@@ -67,7 +67,7 @@ namespace NLog.Targets
          */
 
         /** Current version number */
-        public const String VERSION = "2.1.2";
+        public const String VERSION = "2.1.3";
         /** Size of the internal event queue. */
         const int QUEUE_SIZE = 32768;
         /** Logentries API server address. */
@@ -282,7 +282,9 @@ kAuBvDPPm+C0/M4RLYs=
                 {
                     //Take data from queue
                     string line = queue.Take();
-
+                    //Replace newline chars with line separator to format multi-line events nicely
+                    line = line.Replace('\n', '\u2028');
+                    
                     string final_line = (!HttpPut ? this.Token + line : line) + '\n';
 
                     byte[] data = LogentriesTarget.UTF8.GetBytes(final_line);
@@ -382,7 +384,6 @@ kAuBvDPPm+C0/M4RLYs=
 				{
                     renderedEvent += ", ";
                     renderedEvent += excep;
-					renderedEvent = renderedEvent.Replace('\n', '\u2028');
 				}
 			}
 			catch{ }
