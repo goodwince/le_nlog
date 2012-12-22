@@ -298,6 +298,7 @@ kAuBvDPPm+C0/M4RLYs=
                         }
                         catch (IOException e)
                         {
+                            WriteDebugMessages("Logentries encountered an error when writing to the TCP client stream.", e);
                             //Reopen the lost connection
                             reopenConnection();
                             continue;
@@ -308,7 +309,7 @@ kAuBvDPPm+C0/M4RLYs=
             }
             catch (ThreadInterruptedException e)
             {
-                WriteDebugMessages("Logentries asynchronous socket interrupted");
+                WriteDebugMessages("Logentries asynchronous socket interrupted", e);
             }
 
             closeConnection();
@@ -378,15 +379,21 @@ kAuBvDPPm+C0/M4RLYs=
             //Render message content
             String renderedEvent = this.Layout.Render(logEvent).TrimEnd(trimChars);
 
-			try{
-				String excep = logEvent.Exception.ToString();
-				if(excep.Length > 0)
-				{
-                    renderedEvent += ", ";
-                    renderedEvent += excep;
-				}
-			}
-			catch{ }
+	
+            try
+            {
+                //NLog can pass null references of Exception
+                if (logEvent.Exception != null)
+                {
+                    String excep = logEvent.Exception.ToString();
+                    if (excep.Length > 0)
+                    {
+                        renderedEvent += ", ";
+                        renderedEvent += excep;
+                    }
+                }
+            }
+            catch { }
 
             addLine(renderedEvent);
         }
