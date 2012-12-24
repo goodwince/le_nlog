@@ -34,7 +34,7 @@
 // Viliam Holub <vilda@logentries.com>
 
 /*
- *   VERSION: 2.1.3
+ *   VERSION: 2.1.4
  */
 
 using System;
@@ -67,7 +67,7 @@ namespace NLog.Targets
          */
 
         /** Current version number */
-        public const String VERSION = "2.1.3";
+        public const String VERSION = "2.1.4";
         /** Size of the internal event queue. */
         const int QUEUE_SIZE = 32768;
         /** Logentries API server address. */
