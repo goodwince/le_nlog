@@ -34,7 +34,7 @@
 // Viliam Holub <vilda@logentries.com>
 
 /*
- *   VERSION: 2.1.4
+ *   VERSION: 2.1.6
  */
 
 using System;
@@ -47,15 +47,18 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
 using System.Threading;
+using System.Text;
+
+#if !NET4_0
+using System.Text.RegularExpressions;
+#endif
 
 using NLog;
 using NLog.Common;
 using NLog.Config;
 using NLog.Layouts;
 using NLog.Targets;
-using System.Text;
 
 namespace NLog.Targets
 {
@@ -67,7 +70,7 @@ namespace NLog.Targets
          */
 
         /** Current version number */
-        public const String VERSION = "2.1.4";
+        public const String VERSION = "2.1.6";
         /** Size of the internal event queue. */
         const int QUEUE_SIZE = 32768;
         /** Logentries API server address. */
@@ -100,6 +103,8 @@ namespace NLog.Targets
         const String INVALID_TOKEN = "\n\nIt appears your LOGENTRIES_TOKEN parameter in web/app.config is invalid!\n\n";
         /** Error message displayed when invalid account_key or location parameters are detected */
         const String INVALID_HTTP_PUT = "\n\nIt appears your LOGENTRIES_ACCOUNT_KEY or LOGENTRIES_LOCATION parameters in web/app.config are invalid!\n\n";
+        /** Error message deisplayed when queue overflow occurs */
+        const String QUEUE_OVERFLOW = "\n\nLogentries Buffer Queue Overflow. Message Dropped!\n\n";
 
         /** Logentries API Server Certificate */
         static readonly X509Certificate2 LE_API_CERT = new X509Certificate2(Encoding.UTF8.GetBytes(@"-----BEGIN CERTIFICATE-----
@@ -156,6 +161,10 @@ kAuBvDPPm+C0/M4RLYs=
         public BlockingCollection<string> queue;
         /** Newline char to trim from message for formatting */
         static char[] trimChars = { '\n' };
+#if !NET4_0
+        /** Regex used to validate GUID in .NET3.5 */
+        private static Regex isGuid = new Regex(@"^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$", RegexOptions.Compiled);
+#endif
 
         public LogentriesTarget()
         {
@@ -283,7 +292,7 @@ kAuBvDPPm+C0/M4RLYs=
                     //Take data from queue
                     string line = queue.Take();
                     //Replace newline chars with line separator to format multi-line events nicely
-                    line = line.Replace('\n', '\u2028');
+                    line = line.Replace(System.Environment.NewLine, "\u2028");
                     
                     string final_line = (!HttpPut ? this.Token + line : line) + '\n';
 
@@ -442,14 +451,32 @@ kAuBvDPPm+C0/M4RLYs=
             InternalLogger.Debug(message);
         }
 
+#if !NET4_0
+        static bool IsGuid(string candidate, out Guid output)
+        {
+            bool isValid = false;
+            output = Guid.Empty;
+
+            if (isGuid.IsMatch(candidate))
+            {
+                output = new Guid(candidate);
+                isValid = true;
+            }
+            return isValid;
+        }
+#endif
+
         public bool checkValidUUID(string uuid_input)
         {
-            if (uuid_input == "")
+            if (uuid_input == "" || uuid_input == null)
                 return false;
 
             System.Guid newGuid = System.Guid.NewGuid();
-
+#if !NET4_0
+            return IsGuid(uuid_input, out newGuid);
+#elif NET4_0
             return System.Guid.TryParse(uuid_input, out newGuid);
+#endif
         }
 
         /** Custom Class to support both HTTP PUT and Token-based logging */
