@@ -70,7 +70,7 @@ namespace NLog.Targets
          */
 
         /** Current version number */
-        public const String VERSION = "2.1.6";
+        public const String VERSION = "2.1.8";
         /** Size of the internal event queue. */
         const int QUEUE_SIZE = 32768;
         /** Logentries API server address. */
@@ -160,7 +160,11 @@ kAuBvDPPm+C0/M4RLYs=
         /** Message Queue. */
         public BlockingCollection<string> queue;
         /** Newline char to trim from message for formatting */
-        static char[] trimChars = { '\n' };
+        static char[] trimChars = { '\r', '\n' };
+        /** Non-Unix and Unix Newline */
+        static string[] posix_newline = { "\r\n", "\n" };
+        /** Unicode line separator character */
+        static string line_separator = "\u2028";
 #if !NET4_0
         /** Regex used to validate GUID in .NET3.5 */
         private static Regex isGuid = new Regex(@"^(\{){0,1}[0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12}(\}){0,1}$", RegexOptions.Compiled);
@@ -292,7 +296,10 @@ kAuBvDPPm+C0/M4RLYs=
                     //Take data from queue
                     string line = queue.Take();
                     //Replace newline chars with line separator to format multi-line events nicely
-                    line = line.Replace(System.Environment.NewLine, "\u2028");
+                    foreach (String newline in posix_newline)
+                    {
+                        line = line.Replace(newline, line_separator);
+                    }
                     
                     string final_line = (!HttpPut ? this.Token + line : line) + '\n';
 
@@ -329,13 +336,11 @@ kAuBvDPPm+C0/M4RLYs=
             WriteDebugMessages("Queueing " + line);
 
             //Try to append data to queue
-            bool is_full = !queue.TryAdd(line);
-
-            //If it's full, remove latest item and try again
-            if (is_full)
+            if (!queue.TryAdd(line))
             {
                 queue.Take();
-                queue.TryAdd(line);
+                if (!queue.TryAdd(line))
+                    WriteDebugMessages(QUEUE_OVERFLOW);
             }
         }
 
@@ -388,9 +393,7 @@ kAuBvDPPm+C0/M4RLYs=
             //Render message content
             String renderedEvent = this.Layout.Render(logEvent).TrimEnd(trimChars);
 
-	
-            try
-            {
+            try{
                 //NLog can pass null references of Exception
                 if (logEvent.Exception != null)
                 {
@@ -415,17 +418,17 @@ kAuBvDPPm+C0/M4RLYs=
             //Debug message
         }
 		
-		//Used for UnitTests, write method is protected
-		public void TestWrite(LogEventInfo logEvent)
-		{
-			this.Write(logEvent);
-		}
-		
-		//Used for UnitTests, CloseTarget method is protected
-		public void TestClose()
-		{
-			this.CloseTarget();
-		}
+	//Used for UnitTests, write method is protected
+	public void TestWrite(LogEventInfo logEvent)
+	{
+		this.Write(logEvent);
+	}
+	
+	//Used for UnitTests, CloseTarget method is protected
+	public void TestClose()
+	{
+		this.CloseTarget();
+	}
 
         private void WriteDebugMessages(string message, Exception e)
         {
